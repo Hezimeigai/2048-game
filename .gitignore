@@ -2,3 +2,4 @@ characters_backup/
 *.bak
 .DS_Store
 Thumbs.db
+videos/*.mp4
