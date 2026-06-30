@@ -1,0 +1,1679 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>2048 - 休闲游戏</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+    background: #faf8ef;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    overflow: hidden;
+    touch-action: none;
+    user-select: none;
+    -webkit-user-select: none;
+    position: relative;
+  }
+
+  /* ---- 背景视频 ---- */
+  .bg-video {
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    object-fit: cover;
+    width: 100%;
+    height: 100%;
+    opacity: 0.35;
+    pointer-events: none;
+  }
+  .bg-video.hidden { display: none; }
+
+  /* ---- 背景圆点纹理 ---- */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: radial-gradient(circle, #cdc1b4 1px, transparent 1px);
+    background-size: 32px 32px;
+    opacity: 0.25;
+    z-index: 0;
+    pointer-events: none;
+  }
+
+  /* ---- 背景浮动粒子容器 ---- */
+  .bg-particles {
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    overflow: hidden;
+  }
+
+  .bg-particle {
+    position: absolute;
+    font-weight: 800;
+    color: #cdc1b4;
+    opacity: 0;
+    animation: floatUp var(--dur) linear infinite;
+    animation-delay: var(--delay);
+    left: var(--x);
+    font-size: var(--size);
+  }
+
+  @keyframes floatUp {
+    0%   { transform: translateY(0) rotate(0deg); opacity: 0; }
+    10%  { opacity: 0.16; }
+    90%  { opacity: 0.12; }
+    100% { transform: translateY(-100vh) rotate(var(--rot)); opacity: 0; }
+  }
+
+  .container {
+    width: 500px;
+    max-width: 95vw;
+    padding: 16px;
+    position: relative;
+    z-index: 1;
+  }
+
+  /* ---- 顶栏 ---- */
+  .header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+  }
+
+  .title {
+    font-size: 64px;
+    font-weight: 800;
+    color: #776e65;
+    line-height: 1;
+    background: linear-gradient(135deg, #776e65, #8f7a66, #776e65);
+    background-size: 200% 200%;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    animation: titleShine 3s ease-in-out infinite;
+  }
+
+  @keyframes titleShine {
+    0%, 100% { background-position: 0% 50%; }
+    50%      { background-position: 100% 50%; }
+  }
+
+  .scores {
+    display: flex;
+    gap: 8px;
+  }
+
+  .score-box {
+    background: #bbada0;
+    color: #fff;
+    border-radius: 6px;
+    padding: 6px 18px;
+    text-align: center;
+    min-width: 80px;
+  }
+
+  .score-box .label {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    opacity: 0.85;
+  }
+
+  .score-box .value {
+    font-size: 22px;
+    font-weight: 700;
+  }
+
+  /* ---- 操作栏 ---- */
+  .actions {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+  }
+
+  .tagline {
+    color: #776e65;
+    font-size: 15px;
+  }
+
+  .tagline strong {
+    font-weight: 700;
+  }
+
+  .btn {
+    border: none;
+    border-radius: 6px;
+    padding: 10px 22px;
+    font-size: 15px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: transform 0.08s, box-shadow 0.08s;
+  }
+
+  .btn:active {
+    transform: scale(0.95);
+  }
+
+  .btn-new {
+    background: #8f7a66;
+    color: #f9f6f2;
+  }
+
+  .btn-new:hover {
+    background: #9f8b77;
+  }
+
+  .btn-undo {
+    background: #eee4da;
+    color: #776e65;
+    margin-left: 6px;
+  }
+
+  .btn-undo:hover {
+    background: #e0d4c3;
+  }
+
+  /* ---- 游戏板 ---- */
+  .board-wrapper {
+    position: relative;
+    background: #bbada0;
+    border-radius: 10px;
+    padding: 12px;
+    aspect-ratio: 1;
+    box-shadow: 0 8px 30px rgba(0,0,0,.12);
+  }
+
+  /* 流光渐变边框 */
+  .board-wrapper::before {
+    content: '';
+    position: absolute;
+    inset: -3px;
+    border-radius: 13px;
+    padding: 3px;
+    background: linear-gradient(135deg, #edc22e, #f59563, #f65e3b, #edcf72, #edc22e);
+    background-size: 400% 400%;
+    -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    animation: borderGlow 4s ease-in-out infinite;
+    z-index: -1;
+    pointer-events: none;
+  }
+
+  @keyframes borderGlow {
+    0%, 100% { background-position: 0% 50%; }
+    50%      { background-position: 100% 50%; }
+  }
+
+  .board {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    grid-template-rows: repeat(4, 1fr);
+    gap: 12px;
+    width: 100%;
+    height: 100%;
+  }
+
+  .cell {
+    background: rgba(238, 228, 218, 0.35);
+    border-radius: 6px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .tile {
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%;
+    height: 100%;
+    border-radius: 6px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-weight: 700;
+    transition: top 0.12s ease, left 0.12s ease;
+    z-index: 1;
+  }
+
+  .tile.merged {
+    animation: pop 0.18s ease;
+    z-index: 2;
+  }
+
+  .tile.new-tile {
+    animation: appear 0.15s ease;
+  }
+
+  @keyframes pop {
+    0%   { transform: scale(1); }
+    40%  { transform: scale(1.22); }
+    100% { transform: scale(1); }
+  }
+
+  @keyframes appear {
+    0%   { transform: scale(0); opacity: 0; }
+    100% { transform: scale(1); opacity: 1; }
+  }
+
+  /* ---- 瓦片颜色 ---- */
+  .tile-2    { background: #eee4da; color: #776e65; font-size: 38px; }
+  .tile-4    { background: #ede0c8; color: #776e65; font-size: 38px; }
+  .tile-8    { background: #f2b179; color: #f9f6f2; font-size: 38px; }
+  .tile-16   { background: #f59563; color: #f9f6f2; font-size: 38px; }
+  .tile-32   { background: #f67c5f; color: #f9f6f2; font-size: 38px; }
+  .tile-64   { background: #f65e3b; color: #f9f6f2; font-size: 38px; }
+  .tile-128  { background: #edcf72; color: #f9f6f2; font-size: 32px; box-shadow: 0 0 12px rgba(237,207,114,.35); }
+  .tile-256  { background: #edcc61; color: #f9f6f2; font-size: 32px; box-shadow: 0 0 16px rgba(237,204,97,.4); }
+  .tile-512  { background: #edc850; color: #f9f6f2; font-size: 32px; box-shadow: 0 0 20px rgba(237,200,80,.45); }
+  .tile-1024 { background: #edc53f; color: #f9f6f2; font-size: 26px; box-shadow: 0 0 24px rgba(237,197,63,.5); }
+  .tile-2048 { background: #edc22e; color: #f9f6f2; font-size: 26px; box-shadow: 0 0 30px rgba(237,194,46,.55); animation: shimmer 1.5s ease-in-out infinite; }
+  .tile-4096 { background: #3c3a32; color: #f9f6f2; font-size: 26px; box-shadow: 0 0 30px rgba(60,58,50,.6); animation: shimmer 1.2s ease-in-out infinite; }
+  .tile-8192 { background: #3c3a32; color: #f9f6f2; font-size: 22px; box-shadow: 0 0 30px rgba(60,58,50,.6); animation: shimmer 1s ease-in-out infinite; }
+  .tile-super { background: #3c3a32; color: #f9f6f2; font-size: 20px; box-shadow: 0 0 30px rgba(60,58,50,.6); animation: shimmer 0.8s ease-in-out infinite; }
+
+  @keyframes shimmer {
+    0%, 100% { filter: brightness(1); }
+    50%      { filter: brightness(1.25); }
+  }
+
+  /* ---- 分数弹跳 ---- */
+  .score-pop {
+    position: absolute;
+    color: #f65e3b;
+    font-weight: 800;
+    font-size: 20px;
+    pointer-events: none;
+    z-index: 20;
+    animation: scoreFly 0.7s ease-out forwards;
+    white-space: nowrap;
+  }
+
+  @keyframes scoreFly {
+    0%   { opacity: 1; transform: translateY(0) scale(1); }
+    100% { opacity: 0; transform: translateY(-48px) scale(1.4); }
+  }
+
+  /* ---- 合并粒子爆发 ---- */
+  .merge-particle {
+    position: absolute;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    pointer-events: none;
+    z-index: 20;
+    animation: particleBurst 0.5s ease-out forwards;
+  }
+
+  @keyframes particleBurst {
+    0%   { opacity: 1; transform: translate(0, 0) scale(1); }
+    100% { opacity: 0; transform: translate(var(--px), var(--py)) scale(0); }
+  }
+
+  /* ---- 角色视频 ---- */
+  .chibi-video {
+    pointer-events: none;
+    object-fit: cover;
+  }
+  .chibi-video.hidden { display: none; }
+
+  /* ---- 角色呼吸动画（图片回退时使用） ---- */
+  @keyframes chibiBreathe {
+    0%, 100% { transform: scale(1); filter: brightness(1); }
+    50%      { transform: scale(1.04); filter: brightness(1.08); }
+  }
+
+  /* ---- 角色Q版装饰 ---- */
+  .chibi-float {
+    position: fixed;
+    pointer-events: auto;
+    cursor: pointer;
+    z-index: 0;
+    opacity: 0.22;
+    transition: opacity 0.35s, transform 0.35s, filter 0.35s, box-shadow 0.35s;
+    animation: chibiDrift var(--drift-dur) ease-in-out infinite, chibiBreathe 3.5s ease-in-out infinite;
+    box-shadow: 0 4px 22px rgba(0,0,0,0.15);
+  }
+
+  .chibi-float:hover {
+    opacity: 1 !important;
+    transform: scale(1.25) !important;
+    filter: drop-shadow(0 0 24px var(--glow)) brightness(1.15);
+    box-shadow: 0 8px 36px rgba(0,0,0,0.3);
+    z-index: 2;
+  }
+
+  .chibi-float:active {
+    transform: scale(1.45) !important;
+    filter: drop-shadow(0 0 48px var(--glow)) brightness(1.35);
+  }
+
+  @keyframes chibiDrift {
+    0%, 100% { transform: translateY(0) rotate(0deg); }
+    25%      { transform: translateY(-10px) rotate(3deg); }
+    75%      { transform: translateY(10px) rotate(-3deg); }
+  }
+
+  .chibi-spark {
+    position: fixed;
+    pointer-events: none;
+    z-index: 3;
+    font-size: 24px;
+    animation: sparkFly 0.8s ease-out forwards;
+  }
+
+  @keyframes sparkFly {
+    0%   { opacity: 1; transform: translate(0, 0) scale(1); }
+    100% { opacity: 0; transform: translate(var(--sx), var(--sy)) scale(0.3); }
+  }
+
+  .speech-bubble {
+    position: fixed;
+    pointer-events: none;
+    z-index: 4;
+    background: rgba(255,255,255,0.95);
+    color: #776e65;
+    padding: 6px 14px;
+    border-radius: 16px;
+    font-size: 13px;
+    font-weight: 600;
+    white-space: nowrap;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+    animation: bubbleUp 2s ease-out forwards;
+  }
+
+  .speech-bubble::after {
+    content: '';
+    position: absolute;
+    bottom: -6px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 0; height: 0;
+    border-left: 6px solid transparent;
+    border-right: 6px solid transparent;
+    border-top: 6px solid rgba(255,255,255,0.95);
+  }
+
+  @keyframes bubbleUp {
+    0%   { opacity: 0; transform: translateY(10px); }
+    15%  { opacity: 1; transform: translateY(0); }
+    85%  { opacity: 0.8; transform: translateY(-20px); }
+    100% { opacity: 0; transform: translateY(-40px); }
+  }
+
+  .confetti {
+    position: fixed;
+    pointer-events: none;
+    z-index: 100;
+    width: 10px;
+    height: 10px;
+    animation: confettiFall var(--fall-dur) ease-in forwards;
+  }
+
+  @keyframes confettiFall {
+    0%   { opacity: 1; transform: translateY(0) rotate(0deg) scale(1); }
+    100% { opacity: 0; transform: translateY(100vh) rotate(var(--spin)) scale(0.2); }
+  }
+
+  .chibi-corner {
+    position: absolute;
+    pointer-events: auto;
+    cursor: pointer;
+    z-index: 5;
+    opacity: 0.55;
+    transition: opacity 0.3s, transform 0.3s, filter 0.3s, box-shadow 0.3s;
+    box-shadow: 0 3px 16px rgba(0,0,0,0.2);
+    animation: chibiBreathe 4s ease-in-out infinite;
+  }
+
+  .chibi-corner:hover {
+    opacity: 0.95;
+    transform: scale(1.25);
+    filter: drop-shadow(0 4px 18px rgba(0,0,0,0.25));
+    box-shadow: 0 6px 28px rgba(0,0,0,0.4);
+  }
+
+  .chibi-mascot {
+    display: inline-block;
+    vertical-align: middle;
+    cursor: pointer;
+    animation: chibiBounce 1.5s ease-in-out infinite;
+    transition: transform 0.3s, filter 0.3s, box-shadow 0.3s;
+    box-shadow: 0 3px 14px rgba(176,96,200,0.35);
+  }
+
+  .chibi-mascot:hover {
+    transform: scale(1.3) translateY(-5px);
+    filter: drop-shadow(0 4px 16px rgba(176,96,200,0.55));
+    box-shadow: 0 6px 24px rgba(176,96,200,0.55);
+  }
+
+  @keyframes chibiBounce {
+    0%, 100% { transform: translateY(0); }
+    50%      { transform: translateY(-5px); }
+  }
+
+  .chibi-cheer {
+    animation: cheerJump 0.4s ease-out !important;
+  }
+
+  @keyframes cheerJump {
+    0%   { transform: translateY(0) scale(1); }
+    30%  { transform: translateY(-20px) scale(1.2); }
+    60%  { transform: translateY(-8px) scale(1.1); }
+    100% { transform: translateY(0) scale(1); }
+  }
+
+  /* ---- 排行榜 ---- */
+  .rank-panel {
+    margin-top: 16px;
+    background: #fff;
+    border-radius: 10px;
+    padding: 14px 18px;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+    z-index: 1;
+    position: relative;
+  }
+
+  .rank-title {
+    font-size: 16px;
+    font-weight: 800;
+    color: #776e65;
+    margin-bottom: 10px;
+    text-align: center;
+    letter-spacing: 2px;
+  }
+
+  .rank-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+  }
+
+  .rank-table th {
+    color: #b3a494;
+    font-weight: 600;
+    padding: 4px 8px;
+    border-bottom: 1.5px solid #eee4da;
+    font-size: 11px;
+    letter-spacing: 1px;
+  }
+
+  .rank-table td {
+    padding: 5px 8px;
+    text-align: center;
+    color: #776e65;
+  }
+
+  .rank-table .rank-medal {
+    font-size: 18px;
+  }
+
+  .rank-table .rank-num {
+    font-weight: 700;
+    color: #b3a494;
+  }
+
+  .rank-table .score-highlight {
+    font-weight: 700;
+    color: #f65e3b;
+  }
+
+  .rank-table tr:nth-child(1) td { color: #c89840; font-weight: 700; }
+  .rank-table tr:nth-child(2) td { color: #8898a0; font-weight: 700; }
+  .rank-table tr:nth-child(3) td { color: #b87850; font-weight: 700; }
+
+  .rank-empty {
+    text-align: center;
+    color: #cdc1b4;
+    padding: 18px;
+    font-size: 13px;
+  }
+
+  /* ---- 事件视频弹窗 ---- */
+  .event-video-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 200;
+    background: rgba(0,0,0,0.75);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    pointer-events: auto;
+  }
+  .event-video-overlay.hidden { display: none; }
+  .event-video-overlay video {
+    width: 100vw;
+    height: 100vh;
+    object-fit: contain;
+    background: #000;
+    border-radius: 0;
+    box-shadow: none;
+    animation: videoPopIn 0.4s ease-out;
+  }
+  @keyframes videoPopIn {
+    0%   { transform: scale(0.5); opacity: 0; }
+    100% { transform: scale(1); opacity: 1; }
+  }
+  .event-video-close {
+    position: fixed;
+    top: 24px;
+    right: 32px;
+    background: rgba(0,0,0,0.55);
+    color: #fff;
+    border: 2px solid rgba(255,255,255,0.5);
+    border-radius: 50%;
+    width: 48px;
+    height: 48px;
+    font-size: 24px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.2s, transform 0.2s;
+    z-index: 300;
+  }
+  .event-video-close:hover {
+    background: rgba(220,60,60,0.8);
+    transform: scale(1.1);
+  }
+
+  .volume-bar {
+    position: fixed;
+    bottom: 30px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: rgba(0,0,0,0.55);
+    padding: 10px 20px;
+    border-radius: 28px;
+    z-index: 300;
+    backdrop-filter: blur(8px);
+  }
+  .volume-icon {
+    font-size: 20px;
+    cursor: pointer;
+    user-select: none;
+  }
+  .volume-slider {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 160px;
+    height: 6px;
+    border-radius: 3px;
+    background: rgba(255,255,255,0.3);
+    outline: none;
+    cursor: pointer;
+  }
+  .volume-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: #fff;
+    border: 2px solid rgba(255,255,255,0.6);
+    cursor: pointer;
+    box-shadow: 0 0 8px rgba(255,255,255,0.3);
+  }
+  .volume-slider::-moz-range-thumb {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: #fff;
+    border: 2px solid rgba(255,255,255,0.6);
+    cursor: pointer;
+  }
+
+  /* ---- 弹窗 ---- */
+  .overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(238, 228, 218, 0.73);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    border-radius: 10px;
+    z-index: 10;
+    flex-direction: column;
+    gap: 18px;
+  }
+
+  .overlay.hidden {
+    display: none;
+  }
+
+  .overlay-msg {
+    font-size: 42px;
+    font-weight: 800;
+    color: #776e65;
+    text-align: center;
+  }
+
+  .overlay button {
+    background: #8f7a66;
+    color: #f9f6f2;
+    border: none;
+    border-radius: 6px;
+    padding: 12px 32px;
+    font-size: 17px;
+    font-weight: 700;
+    cursor: pointer;
+  }
+
+  .overlay button:hover {
+    background: #9f8b77;
+  }
+
+  /* ---- 响应式 ---- */
+  @media (max-width: 520px) {
+    .title { font-size: 40px; }
+    .tile-2, .tile-4, .tile-8, .tile-16, .tile-32, .tile-64 { font-size: 26px; }
+    .tile-128, .tile-256, .tile-512 { font-size: 22px; }
+    .tile-1024, .tile-2048, .tile-4096 { font-size: 18px; }
+    .board { gap: 8px; }
+    .board-wrapper { padding: 8px; }
+    .chibi-corner { display: none; }
+    .chibi-float { width: 50px !important; height: 50px !important; opacity: 0.08; }
+    .chibi-mascot { width: 32px !important; height: 32px !important; }
+  }
+</style>
+</head>
+<body>
+
+<!-- 背景视频（如果存在 videos/bg.mp4 或 videos/bg.webm） -->
+<video class="bg-video hidden" id="bgVideo" autoplay loop muted playsinline>
+  <source src="videos/bg.webm" type="video/webm">
+  <source src="videos/bg.mp4" type="video/mp4">
+</video>
+
+<!-- 事件视频弹窗（胜利/失败） -->
+<div class="event-video-overlay hidden" id="eventVideoOverlay">
+  <button class="event-video-close" id="eventVideoClose">✕</button>
+  <video id="eventVideo" playsinline></video>
+  <div class="volume-bar">
+    <span class="volume-icon">🔊</span>
+    <input type="range" class="volume-slider" id="volumeSlider" min="0" max="100" value="80" title="音量">
+  </div>
+</div>
+
+<!-- 背景浮动粒子 -->
+<div class="bg-particles" id="bgParticles"></div>
+
+
+<!-- ====== 背景浮动Q版角色 (真实图片) ====== -->
+<img class="chibi-float" data-name="march7" src="characters/march7.png" style="top:4%;left:3%;--drift-dur:6s;--glow:#ff88a0;width:120px;height:120px;border-radius:50%;object-fit:cover;">
+<img class="chibi-float" data-name="danheng" src="characters/danheng.png" style="top:6%;right:3%;--drift-dur:7s;--glow:#40e0c8;width:115px;height:115px;border-radius:50%;object-fit:cover;animation-delay:2s;">
+<img class="chibi-float" data-name="firefly" src="characters/firefly.png" style="bottom:5%;left:4%;--drift-dur:8s;--glow:#90f0b8;width:125px;height:125px;border-radius:50%;object-fit:cover;animation-delay:1.5s;">
+<img class="chibi-float" data-name="silverwolf" src="characters/silverwolf.png" style="bottom:8%;right:4%;--drift-dur:6.5s;--glow:#b0b0e8;width:115px;height:115px;border-radius:50%;object-fit:cover;animation-delay:3.5s;">
+
+
+<div class="container">
+  <!-- 顶栏 -->
+  <div class="header">
+    <div class="title">
+      <span style="display:inline-flex;align-items:center;gap:6px;">
+        <!-- 卡芙卡 Q版 标题旁 -->
+        <img class="chibi-mascot" data-name="kafka" src="characters/kafka.png" width="50" height="50" style="border-radius:50%;object-fit:cover;">
+        2048
+      </span>
+    </div>
+    <div class="scores">
+      <div class="score-box">
+        <div class="label">轮回</div>
+        <div class="value" id="cycle">1</div>
+      </div>
+      <div class="score-box">
+        <div class="label">分数</div>
+        <div class="value" id="score">0</div>
+      </div>
+      <div class="score-box">
+        <div class="label">最高分</div>
+        <div class="value" id="best">0</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 操作栏 -->
+  <div class="actions">
+    <div class="tagline">合并数字，拼出 <strong>2048</strong>！</div>
+    <div>
+      <button class="btn btn-undo" id="btnUndo" disabled>↩ 撤销</button>
+      <button class="btn btn-new" id="btnNew">🔄 新游戏</button>
+    </div>
+  </div>
+
+  <!-- 游戏板 -->
+  <div class="board-wrapper" id="boardWrapper">
+
+    <!-- ====== 四角Q版角色装饰 ====== -->
+    <img class="chibi-corner" data-name="stelle" src="characters/stelle.png" style="top:-30px;left:-30px;width:68px;height:68px;border-radius:50%;object-fit:cover;">
+    <img class="chibi-corner" data-name="jingyuan" src="characters/jingyuan.png" style="top:-30px;right:-30px;width:70px;height:70px;border-radius:50%;object-fit:cover;">
+    <img class="chibi-corner" data-name="himeko" src="characters/himeko.png" style="bottom:-28px;left:-28px;width:66px;height:66px;border-radius:50%;object-fit:cover;">
+    <img class="chibi-corner" data-name="blade" src="characters/blade.png" style="bottom:-28px;right:-28px;width:68px;height:68px;border-radius:50%;object-fit:cover;">
+
+    <div class="board" id="board"></div>
+    <!-- 胜利/失败浮层 -->
+    <div class="overlay hidden" id="overlay">
+      <div class="overlay-msg" id="overlayMsg"></div>
+      <button id="overlayBtn">🔄 再来一局</button>
+    </div>
+  </div>
+
+  <!-- 底部操作提示 -->
+  <div style="text-align:center; margin-top:14px; color:#b3a494; font-size:13px; z-index:1; position:relative;">
+    ⌨️ <strong>方向键</strong> / <strong>WASD</strong> 移动 &nbsp;|&nbsp; 📱 触屏滑动 &nbsp;|&nbsp; <strong>Ctrl+Z</strong> 撤销
+  </div>
+
+  <!-- 排行榜 -->
+  <div class="rank-panel" id="rankPanel">
+    <div class="rank-title">🏆 轮回榜</div>
+    <table class="rank-table">
+      <thead><tr><th>排名</th><th>轮回</th><th>分数</th></tr></thead>
+      <tbody id="rankBody"></tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+(function() {
+  const SIZE = 4;
+  let grid = [];
+  let score = 0;
+  let bestScore = 0;
+  let won = false;
+  let over = false;
+  let history = []; // { grid, score }
+  const MAX_HISTORY = 10;
+
+  // DOM
+  const boardEl = document.getElementById('board');
+  const scoreEl = document.getElementById('score');
+  const bestEl = document.getElementById('best');
+  const cycleEl = document.getElementById('cycle');
+  const overlay = document.getElementById('overlay');
+  const overlayMsg = document.getElementById('overlayMsg');
+  const overlayBtn = document.getElementById('overlayBtn');
+  const btnUndo = document.getElementById('btnUndo');
+  const btnNew = document.getElementById('btnNew');
+  const boardWrapper = document.getElementById('boardWrapper');
+  const bgParticles = document.getElementById('bgParticles');
+
+  // ==================== 视频系统 ====================
+  const bgVideo = document.getElementById('bgVideo');
+  const eventVideoOverlay = document.getElementById('eventVideoOverlay');
+  const eventVideo = document.getElementById('eventVideo');
+  const eventVideoClose = document.getElementById('eventVideoClose');
+  const volumeSlider = document.getElementById('volumeSlider');
+
+  // 音量控制
+  eventVideo.volume = (volumeSlider.value / 100);
+  volumeSlider.addEventListener('input', function() {
+    eventVideo.volume = (this.value / 100);
+  });
+
+  // 初始化背景视频（尝试加载，加载成功则显示）
+  function initBgVideo() {
+    if (!bgVideo) return;
+    // 尝试加载视频
+    bgVideo.load();
+    bgVideo.addEventListener('loadeddata', function() {
+      bgVideo.classList.remove('hidden');
+      // 降低粒子密度，因为视频背景已就位
+      document.querySelectorAll('.bg-particle').forEach(p => {
+        p.style.opacity = '0.06';
+      });
+    }, { once: true });
+    // 视频加载失败就保持隐藏（回退到粒子背景）
+    bgVideo.addEventListener('error', function() {
+      bgVideo.classList.add('hidden');
+    }, { once: true });
+  }
+
+  // 播放事件视频
+  function playEventVideo(type) {
+    if (!eventVideo || !eventVideoOverlay) return;
+    const sources = {
+      win: ['videos/win.webm', 'videos/win.mp4'],
+      lose: ['videos/lose.webm', 'videos/lose.mp4'],
+      celebrate: ['videos/celebrate.webm', 'videos/celebrate.mp4'],
+    };
+    const urls = sources[type];
+    if (!urls) return;
+
+    // 清空并设置 source
+    eventVideo.innerHTML = '';
+    urls.forEach(url => {
+      const ext = url.split('.').pop();
+      const source = document.createElement('source');
+      source.src = url;
+      source.type = ext === 'webm' ? 'video/webm' : 'video/mp4';
+      eventVideo.appendChild(source);
+    });
+
+    eventVideo.currentTime = 0;
+    eventVideoOverlay.classList.remove('hidden');
+    eventVideo.play().catch(() => {
+      // 加载失败就隐藏
+      eventVideoOverlay.classList.add('hidden');
+    });
+
+    // 视频结束自动关闭
+    eventVideo.onended = function() {
+      eventVideoOverlay.classList.add('hidden');
+    };
+  }
+
+  // 关闭事件视频
+  eventVideoClose.addEventListener('click', function() {
+    eventVideo.pause();
+    eventVideoOverlay.classList.add('hidden');
+  });
+
+  // 点击视频外区域关闭
+  eventVideoOverlay.addEventListener('click', function(e) {
+    if (e.target === eventVideoOverlay) {
+      eventVideo.pause();
+      eventVideoOverlay.classList.add('hidden');
+    }
+  });
+
+  // ==================== 音效系统 ====================
+  let audioCtx = null;
+  function getAudioCtx() {
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+    return audioCtx;
+  }
+
+  function playTone(freq, duration, type, vol, delay) {
+    try {
+      const ctx = getAudioCtx();
+      const t = ctx.currentTime + (delay || 0);
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = type || 'sine';
+      osc.frequency.setValueAtTime(freq, t);
+      gain.gain.setValueAtTime((vol || 0.12), t);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + duration);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(t);
+      osc.stop(t + duration);
+    } catch(e) { /* mute */ }
+  }
+
+  // 滑动音效 - 短促咔嗒
+  function sfxMove() {
+    playTone(180, 0.06, 'sine', 0.08);
+  }
+
+  // 合并音效 - 根据数值升高音调
+  function sfxMerge(value) {
+    const baseFreq = 260 + Math.log2(value / 2) * 45;
+    playTone(baseFreq, 0.15, 'triangle', 0.14);
+    playTone(baseFreq * 1.5, 0.10, 'sine', 0.08, 0.04);
+    // 大合并加低音
+    if (value >= 128) {
+      playTone(baseFreq * 0.5, 0.18, 'triangle', 0.10);
+    }
+  }
+
+  // 新方块生成
+  function sfxSpawn() {
+    playTone(520, 0.04, 'sine', 0.05);
+  }
+
+  // 按钮点击
+  function sfxClick() {
+    playTone(800, 0.03, 'sine', 0.04);
+  }
+
+  // 胜利 - 上行琶音
+  function sfxWin() {
+    const notes = [523, 659, 784, 1047];
+    notes.forEach((f, i) => playTone(f, 0.25, 'triangle', 0.13, i * 0.12));
+    setTimeout(() => {
+      playTone(1047, 0.5, 'triangle', 0.16);
+      playTone(1319, 0.5, 'sine', 0.10, 0.05);
+    }, 600);
+  }
+
+  // 失败 - 下行音
+  function sfxLose() {
+    const notes = [392, 349, 311, 261];
+    notes.forEach((f, i) => playTone(f, 0.2, 'triangle', 0.10, i * 0.18));
+  }
+
+  // 彩带庆祝
+  function sfxCelebrate() {
+    const notes = [784, 880, 988, 1047, 1175, 1319];
+    notes.forEach((f, i) => playTone(f, 0.15, 'sine', 0.08, i * 0.06));
+  }
+
+  // ---- 背景浮动粒子 ----
+  function initBgParticles() {
+    bgParticles.innerHTML = '';
+    const nums = ['2', '4', '8', '16', '32', '64', '128', '256', '512', '1024', '2048'];
+    // 创建 20 个浮动粒子
+    for (let i = 0; i < 20; i++) {
+      const span = document.createElement('span');
+      span.className = 'bg-particle';
+      span.textContent = nums[Math.floor(Math.random() * nums.length)];
+      span.style.setProperty('--x', Math.random() * 94 + '%');
+      span.style.setProperty('--size', (14 + Math.random() * 26) + 'px');
+      span.style.setProperty('--dur', (12 + Math.random() * 16) + 's');
+      span.style.setProperty('--delay', Math.random() * 14 + 's');
+      span.style.setProperty('--rot', (Math.random() - 0.5) * 60 + 'deg');
+      bgParticles.appendChild(span);
+    }
+  }
+
+  // ---- 分数弹跳动画 ----
+  function showScorePop(x, y, points) {
+    const pop = document.createElement('span');
+    pop.className = 'score-pop';
+    pop.textContent = '+' + points;
+    pop.style.left = x + 'px';
+    pop.style.top = y + 'px';
+    boardWrapper.appendChild(pop);
+    pop.addEventListener('animationend', () => pop.remove());
+  }
+
+  // ---- 合并粒子爆发 ----
+  function spawnMergeParticles(x, y, val) {
+    const colors = ['#edc22e', '#f59563', '#f65e3b', '#edcf72', '#f9f6f2', '#f2b179'];
+    const count = Math.min(6 + Math.floor(val / 32), 22); // 根据数值大小决定粒子数
+    for (let i = 0; i < count; i++) {
+      const particle = document.createElement('div');
+      particle.className = 'merge-particle';
+      particle.style.left = x + 'px';
+      particle.style.top = y + 'px';
+      particle.style.background = colors[Math.floor(Math.random() * colors.length)];
+      const angle = Math.random() * Math.PI * 2;
+      const dist = 30 + Math.random() * 50;
+      particle.style.setProperty('--px', Math.cos(angle) * dist + 'px');
+      particle.style.setProperty('--py', Math.sin(angle) * dist + 'px');
+      particle.style.width = (4 + Math.random() * 7) + 'px';
+      particle.style.height = particle.style.width;
+      boardWrapper.appendChild(particle);
+      particle.addEventListener('animationend', () => particle.remove());
+    }
+  }
+
+  // ---- 轮回计数 ----
+  let cycleCount = parseInt(localStorage.getItem('cycle2048')) || 1;
+  cycleEl.textContent = cycleCount;
+  const CYCLE_MILESTONE = 33550336;
+  const MILESTONE_VIDEO_PATH = 'videos/milestone_clean.mp4';
+
+  function playMilestoneVideo() {
+    if (!eventVideo || !eventVideoOverlay) return;
+    eventVideo.innerHTML = '';
+    const source = document.createElement('source');
+    source.src = MILESTONE_VIDEO_PATH;
+    source.type = 'video/mp4';
+    eventVideo.appendChild(source);
+
+    eventVideo.currentTime = 0;
+    eventVideo.loop = false;
+    eventVideoOverlay.classList.remove('hidden');
+    eventVideo.play().catch(() => {
+      eventVideoOverlay.classList.add('hidden');
+    });
+    eventVideo.onended = function() {
+      eventVideoOverlay.classList.add('hidden');
+    };
+  }
+
+  function incrementCycle() {
+    cycleCount++;
+    cycleEl.textContent = cycleCount;
+    localStorage.setItem('cycle2048', cycleCount);
+    // 里程碑检测：轮回达到 33550336 时播放隐藏动画
+    if (cycleCount === CYCLE_MILESTONE) {
+      setTimeout(() => playMilestoneVideo(), 400);
+    }
+  }
+
+  // ---- 初始化 ----
+  function init() {
+    initBgParticles();
+    initBgVideo();
+    bestScore = parseInt(localStorage.getItem('best2048')) || 0;
+    bestEl.textContent = bestScore;
+    grid = Array.from({ length: SIZE }, () => Array(SIZE).fill(0));
+    score = 0;
+    won = false;
+    over = false;
+    history = [];
+    updateScore();
+    hideOverlay();
+    spawnTile();
+    spawnTile();
+    renderBoard();
+    updateUndoBtn();
+  }
+
+  // 新一局轮回
+  function startNewGame() {
+    incrementCycle();
+    init();
+  }
+
+  // ---- 分数 ----
+  function updateScore() {
+    scoreEl.textContent = score;
+    if (score > bestScore) {
+      bestScore = score;
+      bestEl.textContent = bestScore;
+      localStorage.setItem('best2048', bestScore);
+    }
+  }
+
+  // ---- 历史/撤销 ----
+  function saveState() {
+    history.push({
+      grid: grid.map(r => [...r]),
+      score: score
+    });
+    if (history.length > MAX_HISTORY) history.shift();
+    updateUndoBtn();
+  }
+
+  function undo() {
+    if (history.length === 0) return;
+    const prev = history.pop();
+    grid = prev.grid;
+    score = prev.score;
+    won = false;
+    over = false;
+    updateScore();
+    hideOverlay();
+    renderBoard();
+    updateUndoBtn();
+  }
+
+  function updateUndoBtn() {
+    btnUndo.disabled = history.length === 0;
+  }
+
+  // ---- 生成新方块 ----
+  function getEmptyCells() {
+    const cells = [];
+    for (let r = 0; r < SIZE; r++) {
+      for (let c = 0; c < SIZE; c++) {
+        if (grid[r][c] === 0) cells.push({ r, c });
+      }
+    }
+    return cells;
+  }
+
+  function spawnTile() {
+    const empty = getEmptyCells();
+    if (empty.length === 0) return null;
+    const { r, c } = empty[Math.floor(Math.random() * empty.length)];
+    // 90% 出 2，10% 出 4
+    grid[r][c] = Math.random() < 0.9 ? 2 : 4;
+    return { r, c };
+  }
+
+  // ---- 移动逻辑 ----
+  // 处理单行（向左移动的逻辑）
+  function slideRow(row) {
+    // 过滤掉 0
+    let arr = row.filter(v => v !== 0);
+    let merged = [];
+    let scoreGain = 0;
+    let mergePositions = [];
+
+    for (let i = 0; i < arr.length; i++) {
+      if (i < arr.length - 1 && arr[i] === arr[i + 1]) {
+        const val = arr[i] * 2;
+        merged.push(val);
+        scoreGain += val;
+        mergePositions.push(merged.length - 1);
+        i++; // 跳过下一个
+      } else {
+        merged.push(arr[i]);
+      }
+    }
+    // 补 0
+    while (merged.length < SIZE) merged.push(0);
+    return { result: merged, scoreGain, mergePositions };
+  }
+
+  function move(direction) {
+    // direction: 0=up, 1=right, 2=down, 3=left
+    saveState();
+
+    let oldGrid = grid.map(r => [...r]);
+    let newGrid = Array.from({ length: SIZE }, () => Array(SIZE).fill(0));
+    let totalScoreGain = 0;
+    let moves_mergeInfo = []; // [{r, c, merged}] for merged tiles
+
+    for (let i = 0; i < SIZE; i++) {
+      let row = [];
+      let positions = []; // 这行每个元素对应在原始 grid 中的 (r,c)
+
+      if (direction === 0) {
+        // 上: 取第 i 列，从上到下
+        for (let r = 0; r < SIZE; r++) { row.push(oldGrid[r][i]); positions.push({r, c: i}); }
+      } else if (direction === 2) {
+        // 下: 取第 i 列，从下到上
+        for (let r = SIZE - 1; r >= 0; r--) { row.push(oldGrid[r][i]); positions.push({r, c: i}); }
+      } else if (direction === 3) {
+        // 左: 取第 i 行，从左到右
+        for (let c = 0; c < SIZE; c++) { row.push(oldGrid[i][c]); positions.push({r: i, c}); }
+      } else if (direction === 1) {
+        // 右: 取第 i 行，从右到左
+        for (let c = SIZE - 1; c >= 0; c--) { row.push(oldGrid[i][c]); positions.push({r: i, c}); }
+      }
+
+      const { result, scoreGain, mergePositions } = slideRow(row);
+      totalScoreGain += scoreGain;
+
+      // 把 result 写回
+      const resultArr = result;
+      for (let j = 0; j < SIZE; j++) {
+        const val = resultArr[j];
+        let r, c;
+        if (direction === 0)      { r = j; c = i; }           // 上
+        else if (direction === 2)  { r = SIZE - 1 - j; c = i; } // 下
+        else if (direction === 3)  { r = i; c = j; }           // 左
+        else if (direction === 1)  { r = i; c = SIZE - 1 - j; } // 右
+        newGrid[r][c] = val;
+
+        // 记录合并位置
+        if (mergePositions.includes(j)) {
+          moves_mergeInfo.push({ r, c, val });
+        }
+      }
+    }
+
+    // 检查是否真的发生了变化
+    let changed = false;
+    for (let r = 0; r < SIZE; r++) {
+      for (let c = 0; c < SIZE; c++) {
+        if (newGrid[r][c] !== oldGrid[r][c]) changed = true;
+      }
+    }
+
+    if (!changed) {
+      history.pop(); // 撤销刚才保存的状态
+      updateUndoBtn();
+      return false;
+    }
+
+    grid = newGrid;
+    score += totalScoreGain;
+    updateScore();
+
+    // 滑动音效
+    sfxMove();
+
+    // ---- 合并特效：粒子爆发 + 分数弹跳 + 音效 ----
+    if (totalScoreGain > 0 && moves_mergeInfo.length > 0) {
+      const boardRect = boardWrapper.getBoundingClientRect();
+      const gapPct = 3;
+      const cellPct = (100 - gapPct * (SIZE + 1)) / SIZE;
+      moves_mergeInfo.forEach(m => {
+        sfxMerge(m.val);
+        // 计算合并瓦片在 boardWrapper 中的像素位置
+        const tileX = (gapPct + (cellPct + gapPct) * m.c) / 100 * boardRect.width;
+        const tileY = (gapPct + (cellPct + gapPct) * m.r) / 100 * boardRect.height;
+        spawnMergeParticles(tileX + boardRect.width * cellPct / 200, tileY + boardRect.height * cellPct / 200, m.val);
+        showScorePop(tileX + boardRect.width * cellPct / 200, tileY, m.val);
+      });
+    }
+
+    // 生成新方块
+    const spawned = spawnTile();
+    sfxSpawn();
+
+    // 渲染
+    renderBoard({ mergeInfo: moves_mergeInfo, spawned });
+
+    // 检查胜负
+    checkGameState();
+
+    return true;
+  }
+
+  // ---- 渲染 ----
+  function renderBoard(opts = {}) {
+    const { mergeInfo = [], spawned } = opts;
+    boardEl.innerHTML = '';
+
+    // 先创建 4x4 格子背景
+    for (let r = 0; r < SIZE; r++) {
+      for (let c = 0; c < SIZE; c++) {
+        const cell = document.createElement('div');
+        cell.className = 'cell';
+        cell.style.gridRow = r + 1;
+        cell.style.gridColumn = c + 1;
+        boardEl.appendChild(cell);
+      }
+    }
+
+    // 再放置方块
+    for (let r = 0; r < SIZE; r++) {
+      for (let c = 0; c < SIZE; c++) {
+        if (grid[r][c] === 0) continue;
+        const tile = document.createElement('div');
+        const val = grid[r][c];
+        tile.className = 'tile tile-' + (val <= 8192 ? val : 'super');
+        tile.textContent = val;
+
+        // 定位
+        const gapPercent = 3; // 12px gap / ~400px ≈ 3%
+        const cellSize = (100 - gapPercent * (SIZE + 1)) / SIZE;
+        tile.style.width = cellSize + '%';
+        tile.style.height = cellSize + '%';
+        tile.style.left = (gapPercent + (cellSize + gapPercent) * c) + '%';
+        tile.style.top  = (gapPercent + (cellSize + gapPercent) * r) + '%';
+
+        // 合并动画
+        if (mergeInfo.some(m => m.r === r && m.c === c)) {
+          tile.classList.add('merged');
+        }
+
+        // 新方块动画
+        if (spawned && spawned.r === r && spawned.c === c) {
+          tile.classList.add('new-tile');
+        }
+
+        boardEl.appendChild(tile);
+      }
+    }
+  }
+
+  // ---- 胜负判断 ----
+  function checkGameState() {
+    // 胜利
+    if (!won) {
+      for (let r = 0; r < SIZE; r++) {
+        for (let c = 0; c < SIZE; c++) {
+          if (grid[r][c] >= 2048) {
+            won = true;
+            showOverlay('🎉 你赢了！');
+            return;
+          }
+        }
+      }
+    }
+
+    // 检查是否有可用移动
+    if (getEmptyCells().length > 0) return;
+    // 检查相邻是否有相同
+    for (let r = 0; r < SIZE; r++) {
+      for (let c = 0; c < SIZE; c++) {
+        if (c < SIZE - 1 && grid[r][c] === grid[r][c + 1]) return;
+        if (r < SIZE - 1 && grid[r][c] === grid[r + 1][c]) return;
+      }
+    }
+
+    // 没有可用移动 → 失败
+    over = true;
+    showOverlay('😵 游戏结束');
+  }
+
+  function showOverlay(msg) {
+    overlayMsg.textContent = msg;
+    overlay.classList.remove('hidden');
+  }
+
+  function hideOverlay() {
+    overlay.classList.add('hidden');
+  }
+
+  // ---- 键盘操作 ----
+  document.addEventListener('keydown', function(e) {
+    if (over) return;
+    const keyMap = {
+      'ArrowUp': 0,
+      'ArrowRight': 1,
+      'ArrowDown': 2,
+      'ArrowLeft': 3,
+      'w': 0, 'W': 0,
+      'd': 1, 'D': 1,
+      's': 2, 'S': 2,
+      'a': 3, 'A': 3,
+    };
+    const dir = keyMap[e.key];
+    if (dir !== undefined) {
+      e.preventDefault();
+      if (!over && !(won && dir !== undefined)) move(dir);
+    }
+    // Ctrl+Z 撤销
+    if (e.key === 'z' && (e.ctrlKey || e.metaKey)) {
+      e.preventDefault();
+      undo();
+    }
+  });
+
+  // ---- 触屏滑动 ----
+  let touchStartX = 0, touchStartY = 0;
+
+  boardWrapper.addEventListener('touchstart', function(e) {
+    touchStartX = e.touches[0].clientX;
+    touchStartY = e.touches[0].clientY;
+  }, { passive: false });
+
+  boardWrapper.addEventListener('touchend', function(e) {
+    if (over) return;
+    const dx = e.changedTouches[0].clientX - touchStartX;
+    const dy = e.changedTouches[0].clientY - touchStartY;
+    const absDx = Math.abs(dx);
+    const absDy = Math.abs(dy);
+    const minSwipe = 30;
+
+    if (Math.max(absDx, absDy) < minSwipe) return;
+
+    if (absDx > absDy) {
+      move(dx > 0 ? 1 : 3); // 右 : 左
+    } else {
+      move(dy > 0 ? 2 : 0); // 下 : 上
+    }
+  });
+
+  // 阻止触屏滚动
+  boardWrapper.addEventListener('touchmove', function(e) {
+    e.preventDefault();
+  }, { passive: false });
+
+  // ---- 按钮 ----
+  btnNew.addEventListener('click', () => { sfxClick(); startNewGame(); });
+  overlayBtn.addEventListener('click', () => { sfxClick(); startNewGame(); });
+  btnUndo.addEventListener('click', () => { sfxClick(); undo(); });
+
+  // ==================== 角色互动系统 ====================
+
+  // 角色对话库
+  const BUBBLES = {
+    march7: ['📸 来拍张照吧！','加油加油~ ✨','好厉害的操作！','嘿嘿，我在看着呢~'],
+    danheng: ['不可大意。','继续前进。','嗯，不错的一步。','冷静应对。'],
+    firefly: ['像萤火虫一样闪耀呢~','温暖的光...','加油哦~ 🌟','不要放弃！'],
+    silverwolf: ['这波操作可以啊！','哼~还行吧','GG！','来点挑战性的！'],
+    kafka: ['命运在注视着你...','呵呵，有意思。','继续吧，开拓者。','让我看看你的实力~'],
+    stelle: ['垃圾桶在召唤...','规则就是用来打破的！','冲！🏃','有意思~'],
+    jingyuan: ['运筹帷幄。','大局观很重要。','从容应对即可。','嗯，不错。'],
+    himeko: ['优雅地解决吧~','咖啡时间到 ☕','来杯咖啡吗？','沉着冷静才是关键。'],
+    blade: ['...','还不够。','继续。','...'],
+  };
+
+  // 获取角色名
+  function getChibiName(el) {
+    return el.dataset.name || '';
+  }
+
+  // 显示对话气泡
+  function showBubble(el, text) {
+    const rect = el.getBoundingClientRect();
+    // 移除旧气泡
+    el._bubble && el._bubble.remove();
+    const bubble = document.createElement('div');
+    bubble.className = 'speech-bubble';
+    bubble.textContent = text;
+    bubble.style.left = (rect.left + rect.width / 2) + 'px';
+    bubble.style.top = (rect.top - 20) + 'px';
+    bubble.style.transform = 'translateX(-50%)';
+    document.body.appendChild(bubble);
+    bubble.addEventListener('animationend', () => bubble.remove());
+    el._bubble = bubble;
+  }
+
+  // 点击火花
+  function sparkBurst(x, y, count) {
+    const emojis = ['✨','💫','⭐','🌟','💖','💝','🎀','💎'];
+    for (let i = 0; i < count; i++) {
+      const spark = document.createElement('span');
+      spark.className = 'chibi-spark';
+      spark.textContent = emojis[Math.floor(Math.random() * emojis.length)];
+      spark.style.left = x + 'px';
+      spark.style.top = y + 'px';
+      const angle = Math.random() * Math.PI * 2;
+      const dist = 40 + Math.random() * 80;
+      spark.style.setProperty('--sx', Math.cos(angle) * dist + 'px');
+      spark.style.setProperty('--sy', Math.sin(angle) * dist + 'px');
+      spark.style.fontSize = (14 + Math.random() * 18) + 'px';
+      document.body.appendChild(spark);
+      spark.addEventListener('animationend', () => spark.remove());
+    }
+  }
+
+  // 彩带庆祝
+  function confettiCelebration() {
+    const colors = ['#edc22e','#f59563','#f65e3b','#edcf72','#ff6b8a','#4ad8c0','#c870e0','#5ee8d0'];
+    for (let i = 0; i < 60; i++) {
+      const conf = document.createElement('div');
+      conf.className = 'confetti';
+      conf.style.left = (5 + Math.random() * 90) + '%';
+      conf.style.top = -(Math.random() * 60) + 'px';
+      conf.style.background = colors[Math.floor(Math.random() * colors.length)];
+      conf.style.width = (6 + Math.random() * 10) + 'px';
+      conf.style.height = (6 + Math.random() * 10) + 'px';
+      conf.style.borderRadius = Math.random() > 0.5 ? '50%' : '2px';
+      conf.style.setProperty('--fall-dur', (1.5 + Math.random() * 2.5) + 's');
+      conf.style.setProperty('--spin', (Math.random() * 720 - 360) + 'deg');
+      document.body.appendChild(conf);
+      conf.addEventListener('animationend', () => conf.remove());
+    }
+  }
+
+  // 所有角色欢呼
+  function cheerAllCharacters() {
+    document.querySelectorAll('.chibi-float, .chibi-corner, .chibi-mascot').forEach(el => {
+      el.classList.add('chibi-cheer');
+      el.addEventListener('animationend', () => el.classList.remove('chibi-cheer'), { once: true });
+    });
+  }
+
+  // 绑定背景浮动角色 - 点击互动
+  document.querySelectorAll('.chibi-float').forEach(el => {
+    const name = getChibiName(el);
+    el.addEventListener('click', function(e) {
+      e.stopPropagation();
+      const rect = el.getBoundingClientRect();
+      const cx = rect.left + rect.width / 2;
+      const cy = rect.top + rect.height / 2;
+      sparkBurst(cx, cy, 10);
+      const msgs = BUBBLES[name] || ['你好呀~'];
+      showBubble(el, msgs[Math.floor(Math.random() * msgs.length)]);
+      // 小加分
+      if (!over) {
+        score += 2;
+        updateScore();
+      }
+    });
+  });
+
+  // 绑定四角角色 - 点击出提示
+  document.querySelectorAll('.chibi-corner').forEach(el => {
+    const name = getChibiName(el);
+    el.addEventListener('click', function(e) {
+      e.stopPropagation();
+      const rect = el.getBoundingClientRect();
+      sparkBurst(rect.left + rect.width/2, rect.top + rect.height/2, 6);
+      const tips = [
+        '💡 尽量把大数字保持在角落',
+        '💡 不要急着合并小数字',
+        '💡 规划好移动路线',
+        '💡 Ctrl+Z 可以撤销哦',
+      ];
+      showBubble(el, tips[Math.floor(Math.random() * tips.length)]);
+    });
+  });
+
+  // 绑定标题旁卡芙卡
+  const mascotEl = document.querySelector('.chibi-mascot');
+  if (mascotEl) {
+    mascotEl.addEventListener('click', function(e) {
+      e.stopPropagation();
+      const rect = mascotEl.getBoundingClientRect();
+      sparkBurst(rect.left + rect.width/2, rect.top + rect.height/2, 14);
+      showBubble(mascotEl, BUBBLES.kafka[Math.floor(Math.random() * BUBBLES.kafka.length)]);
+      if (!over) {
+        score += 4;
+        updateScore();
+      }
+    });
+  }
+
+  // ==================== 排行榜系统 ====================
+  const rankBody = document.getElementById('rankBody');
+  const MAX_RANK = 10;
+
+  function loadRankings() {
+    try {
+      return JSON.parse(localStorage.getItem('rank2048')) || [];
+    } catch(e) { return []; }
+  }
+
+  function saveRankings(rankings) {
+    localStorage.setItem('rank2048', JSON.stringify(rankings));
+  }
+
+  function addScoreToRank() {
+    if (score === 0) return;
+    let rankings = loadRankings();
+    rankings.push({ score, cycle: cycleCount, time: Date.now() });
+    rankings.sort((a, b) => b.score - a.score);
+    rankings = rankings.slice(0, MAX_RANK);
+    saveRankings(rankings);
+    renderRankings();
+  }
+
+  function medalIcon(i) {
+    return ['🥇','🥈','🥉'][i] || '';
+  }
+
+  function renderRankings() {
+    const rankings = loadRankings();
+    if (rankings.length === 0) {
+      rankBody.innerHTML = '<tr><td colspan="3" class="rank-empty">— 尚未有轮回记录 —</td></tr>';
+      return;
+    }
+    rankBody.innerHTML = rankings.map((r, i) => `
+      <tr>
+        <td><span class="rank-medal">${medalIcon(i)}</span><span class="rank-num">${i+1}</span></td>
+        <td>第 ${r.cycle} 世</td>
+        <td class="score-highlight">${r.score.toLocaleString()}</td>
+      </tr>
+    `).join('');
+  }
+
+  // 页面加载时渲染排行榜
+  renderRankings();
+
+  // ---- 覆盖 move() 添加合并后欢呼 ----
+  const originalMove = move;
+  move = function(direction) {
+    const oldScore = score;
+    const result = originalMove(direction);
+    if (result) {
+      const gained = score - oldScore;
+      // 大合并 (>100分) → 角色欢呼
+      if (gained >= 128) {
+        cheerAllCharacters();
+        sfxCelebrate();
+        // 1024+ → 彩带庆祝
+        if (gained >= 1024) {
+          confettiCelebration();
+          // 随机一句话
+          const celebs = ['🎉 太强了！','🔥 燃起来了！','💪 无敌！','👑 王者操作！','🌟 你就是开拓者！'];
+          const el = document.querySelector('.chibi-float[data-name="march7"]') || mascotEl;
+          if (el) showBubble(el, celebs[Math.floor(Math.random() * celebs.length)]);
+        }
+      }
+      // 达到 2048
+      if (!won) {
+        for (let r = 0; r < SIZE; r++)
+          for (let c = 0; c < SIZE; c++)
+            if (grid[r][c] >= 2048 && !won) {
+              confettiCelebration();
+              setTimeout(() => confettiCelebration(), 600);
+              cheerAllCharacters();
+            }
+      }
+    }
+    return result;
+  };
+
+  // 随机闲话 - 偶尔有角色说话
+  function randomIdleBubble() {
+    if (over) return;
+    const floats = document.querySelectorAll('.chibi-float');
+    if (floats.length === 0) return;
+    const el = floats[Math.floor(Math.random() * floats.length)];
+    const name = getChibiName(el);
+    const idleMsgs = {
+      march7: ['好安静啊...','在等我拍照吗？','三月七在这里哦~'],
+      danheng: ['...','冷静思考。','下一步很关键。'],
+      firefly: ['闪闪发光...','温暖的感觉~','光会指引你。'],
+      silverwolf: ['快点操作啊~','我都等困了','来点刺激的！'],
+    };
+    const msgs = idleMsgs[name] || ['嗯...'];
+    showBubble(el, msgs[Math.floor(Math.random() * msgs.length)]);
+  }
+
+  // 每 25-40 秒随机一句闲话
+  function scheduleIdleBubble() {
+    const delay = 25000 + Math.random() * 20000;
+    setTimeout(() => {
+      randomIdleBubble();
+      scheduleIdleBubble();
+    }, delay);
+  }
+  scheduleIdleBubble();
+
+  // 游戏结束时的角色反应
+  const originalShowOverlay = showOverlay;
+  let scoreRecorded = false;
+  showOverlay = function(msg) {
+    if (!scoreRecorded) {
+      addScoreToRank();
+      scoreRecorded = true;
+    }
+    originalShowOverlay(msg);
+    if (msg.includes('赢了')) {
+      sfxWin();
+      confettiCelebration();
+      setTimeout(() => confettiCelebration(), 500);
+      cheerAllCharacters();
+      const el = document.querySelector('.chibi-float[data-name="march7"]');
+      if (el) showBubble(el, '🎉 恭喜通关！你太厉害了！');
+      // 播放胜利视频
+      setTimeout(() => playEventVideo('win'), 800);
+    } else if (msg.includes('结束')) {
+      sfxLose();
+      const el = document.querySelector('.chibi-float[data-name="danheng"]');
+      if (el) showBubble(el, '...下次再战。');
+      // 播放失败视频
+      setTimeout(() => playEventVideo('lose'), 600);
+    }
+  };
+  // 新游戏时重置记录标记
+  const originalInit = init;
+  init = function() {
+    scoreRecorded = false;
+    originalInit();
+  };
+
+  // ---- 启动 ----
+  init();
+})();
+</script>
+</body>
+</html>
