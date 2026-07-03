@@ -1151,8 +1151,18 @@
   const CYCLE_MILESTONE = 33550336;
   const MILESTONE_VIDEO_PATH = 'videos/milestone_clean.mp4';
 
+  // 后台预加载视频
+  const preloadVideo = document.createElement('video');
+  preloadVideo.preload = 'auto';
+  preloadVideo.muted = true;
+  preloadVideo.src = MILESTONE_VIDEO_PATH;
+  preloadVideo.load();
+
   function playMilestoneVideo() {
     if (!eventVideo || !eventVideoOverlay) return;
+
+    // 检查预加载是否已有足够缓冲
+    const ready = preloadVideo.readyState >= 3; // HAVE_FUTURE_DATA
     eventVideo.innerHTML = '';
     const s = document.createElement('source');
     s.src = MILESTONE_VIDEO_PATH;
@@ -1160,19 +1170,29 @@
     eventVideo.appendChild(s);
     eventVideo.currentTime = 0;
     eventVideo.loop = false;
-    eventVideo.load();
+    eventVideo.preload = 'auto';
 
     let shown = false;
-    eventVideo.onplaying = function() {
+    eventVideo.oncanplaythrough = function() {
+      // 缓冲足够，开始播放
       if (!shown) { shown = true; eventVideoOverlay.classList.remove('hidden'); }
+      eventVideo.play().catch(() => { eventVideoOverlay.classList.add('hidden'); });
     };
     eventVideo.onended = function() { eventVideoOverlay.classList.add('hidden'); };
     eventVideo.onerror = function() { /* 视频不存在 */ };
-    eventVideo.play().catch(() => {});
+
+    // 如果已经预加载好了，直接触发
+    if (ready) {
+      if (!shown) { shown = true; eventVideoOverlay.classList.remove('hidden'); }
+      eventVideo.play().catch(() => { eventVideoOverlay.classList.add('hidden'); });
+    } else {
+      // 还没缓冲够，先加载
+      eventVideo.load();
+    }
 
     setTimeout(() => {
       if (!shown) { eventVideo.pause(); eventVideo.innerHTML = ''; }
-    }, 2000);
+    }, 15000);
   }
 
   function incrementCycle() {
