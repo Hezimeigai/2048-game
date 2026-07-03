@@ -981,24 +981,10 @@
     const urls = sources[type];
     if (!urls) return;
 
-    // 先探测视频是否存在，不存在则静默跳过
-    const testVideo = document.createElement('video');
-    testVideo.preload = 'metadata';
-    testVideo.muted = true;
-    let loaded = false;
-
-    urls.forEach(url => {
-      const ext = url.split('.').pop();
-      const source = document.createElement('source');
-      source.src = url;
-      source.type = ext === 'webm' ? 'video/webm' : 'video/mp4';
-      testVideo.appendChild(source);
-    });
-
-    testVideo.onloadedmetadata = function() {
-      if (loaded) return;
-      loaded = true;
-      // 视频存在，开始播放
+    // 用 fetch HEAD 探测视频是否存在
+    fetch(urls[0], { method: 'HEAD' }).then(resp => {
+      if (!resp.ok) return;
+      // 视频存在，加载播放
       eventVideo.innerHTML = '';
       urls.forEach(url => {
         const ext = url.split('.').pop();
@@ -1011,12 +997,7 @@
       eventVideoOverlay.classList.remove('hidden');
       eventVideo.play().catch(() => eventVideoOverlay.classList.add('hidden'));
       eventVideo.onended = function() { eventVideoOverlay.classList.add('hidden'); };
-    };
-
-    // 1.5秒内没加载成功说明视频不存在，静默跳过
-    setTimeout(() => {
-      if (!loaded) { testVideo.remove(); }
-    }, 1500);
+    }).catch(() => {}); // 网络错误或文件不存在，静默跳过
   }
 
   // 关闭事件视频
@@ -1164,19 +1145,9 @@
 
   function playMilestoneVideo() {
     if (!eventVideo || !eventVideoOverlay) return;
-    // 探测视频是否存在
-    const testVideo = document.createElement('video');
-    testVideo.preload = 'metadata';
-    testVideo.muted = true;
-    const source = document.createElement('source');
-    source.src = MILESTONE_VIDEO_PATH;
-    source.type = 'video/mp4';
-    testVideo.appendChild(source);
-    let loaded = false;
-
-    testVideo.onloadedmetadata = function() {
-      if (loaded) return;
-      loaded = true;
+    // 用 fetch HEAD 探测视频是否存在
+    fetch(MILESTONE_VIDEO_PATH, { method: 'HEAD' }).then(resp => {
+      if (!resp.ok) return;
       eventVideo.innerHTML = '';
       const s = document.createElement('source');
       s.src = MILESTONE_VIDEO_PATH;
@@ -1187,9 +1158,7 @@
       eventVideoOverlay.classList.remove('hidden');
       eventVideo.play().catch(() => eventVideoOverlay.classList.add('hidden'));
       eventVideo.onended = function() { eventVideoOverlay.classList.add('hidden'); };
-    };
-
-    setTimeout(() => { if (!loaded) testVideo.remove(); }, 1500);
+    }).catch(() => {}); // 静默跳过
   }
 
   function incrementCycle() {
