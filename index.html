@@ -676,17 +676,146 @@
     background: #9f8b77;
   }
 
-  /* ---- 响应式 ---- */
+  /* ---- 响应式：平板 ---- */
+  @media (max-width: 768px) and (min-width: 521px) {
+    .container { width: 480px; }
+    .title { font-size: 52px; }
+    .chibi-float { width: 80px !important; height: 80px !important; }
+    .chibi-corner { width: 50px !important; height: 50px !important; }
+  }
+
+  /* ---- 响应式：手机 ---- */
   @media (max-width: 520px) {
-    .title { font-size: 40px; }
-    .tile-2, .tile-4, .tile-8, .tile-16, .tile-32, .tile-64 { font-size: 26px; }
-    .tile-128, .tile-256, .tile-512 { font-size: 22px; }
-    .tile-1024, .tile-2048, .tile-4096 { font-size: 18px; }
-    .board { gap: 8px; }
-    .board-wrapper { padding: 8px; }
+    /* 允许页面滚动以防内容超出 */
+    body {
+      overflow-y: auto;
+      overflow-x: hidden;
+      align-items: flex-start;
+      padding-top: 8px;
+      min-height: 100vh;
+      min-height: 100dvh;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 100vw;
+      padding: 8px 10px;
+    }
+
+    /* 顶栏 - 紧凑排列 */
+    .header {
+      margin-bottom: 8px;
+      align-items: center;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+
+    .title {
+      font-size: 36px;
+      order: 1;
+    }
+
+    .scores {
+      order: 2;
+      gap: 4px;
+    }
+
+    .score-box {
+      padding: 4px 10px;
+      min-width: 55px;
+    }
+
+    .score-box .label { font-size: 10px; }
+    .score-box .value { font-size: 17px; }
+
+    /* 操作栏 */
+    .actions {
+      margin-bottom: 8px;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    .tagline { font-size: 13px; }
+
+    .btn {
+      padding: 8px 14px;
+      font-size: 13px;
+    }
+
+    /* 游戏板 - 撑满宽度 */
+    .board-wrapper {
+      padding: 8px;
+      border-radius: 8px;
+      aspect-ratio: 1;
+      width: 100%;
+      max-width: 100%;
+    }
+
+    .board-wrapper::before { inset: -2px; border-radius: 10px; }
+
+    .board { gap: 6px; }
+
+    /* 瓦片字体缩放 */
+    .tile-2, .tile-4, .tile-8, .tile-16, .tile-32, .tile-64 { font-size: 24px; }
+    .tile-128, .tile-256, .tile-512 { font-size: 18px; }
+    .tile-1024, .tile-2048, .tile-4096 { font-size: 14px; }
+    .tile-8192 { font-size: 12px; }
+    .tile-super { font-size: 11px; }
+
+    /* 角色装饰 - 最小化避免遮挡 */
     .chibi-corner { display: none; }
-    .chibi-float { width: 50px !important; height: 50px !important; opacity: 0.08; }
-    .chibi-mascot { width: 32px !important; height: 32px !important; }
+    .chibi-float {
+      width: 40px !important;
+      height: 40px !important;
+      opacity: 0.12;
+      box-shadow: none;
+    }
+    .chibi-float:hover {
+      opacity: 0.7 !important;
+      transform: scale(1.8) !important;
+    }
+    .chibi-mascot {
+      width: 28px !important;
+      height: 28px !important;
+    }
+
+    /* 排行榜 */
+    .rank-panel {
+      margin-top: 10px;
+      padding: 10px 12px;
+      margin-bottom: 12px;
+    }
+
+    .rank-table { font-size: 12px; }
+    .rank-table th { font-size: 10px; padding: 3px 4px; }
+    .rank-table td { padding: 3px 4px; }
+
+    /* 弹窗 */
+    .overlay-msg { font-size: 28px; }
+    .overlay button { padding: 10px 24px; font-size: 15px; }
+
+    /* 底部操作提示 */
+    .container > div:last-child { font-size: 11px; margin-top: 8px; }
+
+    /* 视频弹窗 */
+    .event-video-close {
+      width: 38px;
+      height: 38px;
+      font-size: 18px;
+      top: 14px;
+      right: 16px;
+    }
+
+    .volume-bar {
+      bottom: 16px;
+      padding: 8px 14px;
+      gap: 6px;
+    }
+
+    .volume-slider { width: 100px; }
+
+    /* 粒子背景减少 */
+    .bg-particle { display: none; }
   }
 </style>
 </head>
