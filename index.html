@@ -981,23 +981,31 @@
     const urls = sources[type];
     if (!urls) return;
 
-    // 用 fetch HEAD 探测视频是否存在
-    fetch(urls[0], { method: 'HEAD' }).then(resp => {
-      if (!resp.ok) return;
-      // 视频存在，加载播放
-      eventVideo.innerHTML = '';
-      urls.forEach(url => {
-        const ext = url.split('.').pop();
-        const source = document.createElement('source');
-        source.src = url;
-        source.type = ext === 'webm' ? 'video/webm' : 'video/mp4';
-        eventVideo.appendChild(source);
-      });
-      eventVideo.currentTime = 0;
-      eventVideoOverlay.classList.remove('hidden');
-      eventVideo.play().catch(() => eventVideoOverlay.classList.add('hidden'));
-      eventVideo.onended = function() { eventVideoOverlay.classList.add('hidden'); };
-    }).catch(() => {}); // 网络错误或文件不存在，静默跳过
+    eventVideo.innerHTML = '';
+    urls.forEach(url => {
+      const ext = url.split('.').pop();
+      const source = document.createElement('source');
+      source.src = url;
+      source.type = ext === 'webm' ? 'video/webm' : 'video/mp4';
+      eventVideo.appendChild(source);
+    });
+    eventVideo.currentTime = 0;
+    eventVideo.load();
+
+    // 只有视频真正开始播放后才显示弹窗
+    let shown = false;
+    eventVideo.onplaying = function() {
+      if (!shown) { shown = true; eventVideoOverlay.classList.remove('hidden'); }
+    };
+    eventVideo.onended = function() { eventVideoOverlay.classList.add('hidden'); };
+    eventVideo.onerror = function() { /* 视频不存在，什么都不做 */ };
+    // play失败静默
+    eventVideo.play().catch(() => {});
+
+    // 2秒超时还没播放说明视频不存在
+    setTimeout(() => {
+      if (!shown) { eventVideo.pause(); eventVideo.innerHTML = ''; }
+    }, 2000);
   }
 
   // 关闭事件视频
@@ -1145,20 +1153,26 @@
 
   function playMilestoneVideo() {
     if (!eventVideo || !eventVideoOverlay) return;
-    // 用 fetch HEAD 探测视频是否存在
-    fetch(MILESTONE_VIDEO_PATH, { method: 'HEAD' }).then(resp => {
-      if (!resp.ok) return;
-      eventVideo.innerHTML = '';
-      const s = document.createElement('source');
-      s.src = MILESTONE_VIDEO_PATH;
-      s.type = 'video/mp4';
-      eventVideo.appendChild(s);
-      eventVideo.currentTime = 0;
-      eventVideo.loop = false;
-      eventVideoOverlay.classList.remove('hidden');
-      eventVideo.play().catch(() => eventVideoOverlay.classList.add('hidden'));
-      eventVideo.onended = function() { eventVideoOverlay.classList.add('hidden'); };
-    }).catch(() => {}); // 静默跳过
+    eventVideo.innerHTML = '';
+    const s = document.createElement('source');
+    s.src = MILESTONE_VIDEO_PATH;
+    s.type = 'video/mp4';
+    eventVideo.appendChild(s);
+    eventVideo.currentTime = 0;
+    eventVideo.loop = false;
+    eventVideo.load();
+
+    let shown = false;
+    eventVideo.onplaying = function() {
+      if (!shown) { shown = true; eventVideoOverlay.classList.remove('hidden'); }
+    };
+    eventVideo.onended = function() { eventVideoOverlay.classList.add('hidden'); };
+    eventVideo.onerror = function() { /* 视频不存在 */ };
+    eventVideo.play().catch(() => {});
+
+    setTimeout(() => {
+      if (!shown) { eventVideo.pause(); eventVideo.innerHTML = ''; }
+    }, 2000);
   }
 
   function incrementCycle() {
